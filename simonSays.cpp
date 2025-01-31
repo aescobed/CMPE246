@@ -4,12 +4,43 @@
 #include "include/SimonSays.h"
 #include <cstdlib>  // for rand() and srand()
 #include <ctime>    // for time()
+#include <pigpio.h>
+#include <chrono>
+#include <thread>
+#include <iostream>
 
+
+const int BUTTON_PIN = 23;  
+const int LED_PIN = 18;
+
+
+
+bool detectPress()
+{
+    static int lastState = 1;
+    int currentState = gpioRead(BUTTON_PIN);
+
+    if(currentState && !lastState)
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        lastState = 1;
+        return true;
+    }
+
+    lastState = currentState;
+    return false;
+}
 
 
 
 int main()
 {
+
+    gpioInitialise();
+
+    gpioSetMode(BUTTON_PIN, PI_INPUT);
+    gpioSetPullUpDown(BUTTON_PIN, PI_PUD_UP);
+
 
     int nCommands;              // number of possible commands that Simon will give
     int nPreSimonDoesSay;       // number of ways in which Simon will say that he said this before the command
@@ -45,10 +76,10 @@ int main()
 
     const char* commandStrs[] = 
     {
-        // TODO: Add command string here
-        "press the button twice",
+        "do nothing",
         "press the button once",
-        "do nothing"
+        "press the button twice"
+        // TODO: Add command string here
     };
 
 
@@ -71,6 +102,8 @@ int main()
 
     simonObj.commandStr = commandStrs[randomCommand];
 
+    int pressCount = 0;
+
     // if Simon did say this statement
     if(randomDoesSimonSay)
     {
@@ -79,12 +112,36 @@ int main()
 
         int randomSimonSaysStrInd = std::rand() % nSimonDoesSay;       // Generate a random number to decide on the Simon says string
 
+        auto duration = std::chrono::seconds(5);
+
         // If we choose a pre string
         if(randomSimonSaysStrInd < nPreSimonDoesSay)
         {
+            
             simonObj.simonSaysBeforeCommandBool = true;
 
             simonObj.simonSaysStr = preSimonSaysStrs[randomSimonSaysStrInd];
+
+            simonObj.printSimonStatement();
+
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+
+            auto startTime = std::chrono::steady_clock::now();
+
+            while(std::chrono::steady_clock::now() - startTime < duration)
+            {
+
+                if(detectPress())
+                {
+
+                    pressCount++;
+
+                    printf("button press detected\n");
+
+                }
+
+            }
+
 
         }
         else
@@ -94,9 +151,53 @@ int main()
 
             simonObj.simonSaysStr = postSimonSaysStrs[randomSimonSaysStrInd - nPreSimonDoesSay];
 
+            simonObj.printSimonStatement();
+
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+
+            auto startTime = std::chrono::steady_clock::now();
+
+            while(std::chrono::steady_clock::now() - startTime < duration)
+            {
+
+                if(detectPress())
+                {
+
+                    pressCount++;
+
+                    printf("button press detected\n");
+
+                }
+
+            }
+
         }
 
-        simonObj.printSimonStatement();
+        switch(randomCommand)
+        {
+            case 0:
+                if(pressCount == 0)
+                    printf("Success!\n");
+                else
+                    printf("Incorrect!\n");
+                break;
+            case 1:
+                if(pressCount == 1)
+                    printf("Success!\n");
+                else
+                    printf("Incorrect!\n");
+                break;
+            case 2:
+                if(pressCount == 2)
+                    printf("Success!\n");
+                else
+                    printf("Incorrect!\n");
+                break;
+            default:
+                printf("Incorrect\n");
+        }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
     }
     else
@@ -125,29 +226,13 @@ int main()
 
         simonObj.printSimonStatement();
 
+        std::this_thread::sleep_for(std::chrono::milliseconds(5000));
+
+        // You should never do anything here
+
+
     }
 
     return 0;
 
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
